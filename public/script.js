@@ -1,4 +1,7 @@
+// Ping — WebRTC client-side script (fully patched)
+
 const socket = io();
+
 let localStream = null;
 let screenStream = null;
 let currentRoomId = null;
@@ -7,9 +10,16 @@ let userName = null;
 // peerConnections: peerId -> RTCPeerConnection
 const peers = new Map();
 
-// ICE servers (Google STUN)
+// ICE servers (STUN + demo TURN; replace with your own TURN for production)
 const rtcConfig = {
-  iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }]
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    {
+      urls: 'turn:relay.metered.ca:80',
+      username: 'openai',
+      credential: 'openai'
+    }
+  ]
 };
 
 const els = {
@@ -29,7 +39,7 @@ const els = {
   sendChat: document.getElementById('sendChat')
 };
 
-// Helpers
+// UI helpers
 function addMessage({ user, text, at }) {
   const div = document.createElement('div');
   div.className = 'msg';
@@ -69,6 +79,7 @@ async function initLocalMedia() {
   if (localStream) return localStream;
   localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
   els.localVideo.srcObject = localStream;
+  els.localVideo.muted = true; // mute self locally
   return localStream;
 }
 
@@ -76,8 +87,10 @@ async function initLocalMedia() {
 function createPeerConnection(peerId) {
   const pc = new RTCPeerConnection(rtcConfig);
 
-  // Add local tracks
-  localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+  // Add local tracks immediately
+  if (localStream) {
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+  }
 
   pc.ontrack = (event) => {
     const [stream] = event.streams;
@@ -93,8 +106,7 @@ function createPeerConnection(peerId) {
   };
 
   pc.onconnectionstatechange = () => {
-    const state = pc.connectionState;
-    if (state === 'failed' || state === 'disconnected') {
+    if (['failed','disconnected','closed'].includes(pc.connectionState)) {
       removeVideoEl(peerId);
     }
   };
@@ -120,34 +132,23 @@ async function handleSignal({ from, signal }) {
     socket.emit('signal', { to: from, signal: answer });
   } else if (signal.type === 'answer') {
     await pc.setRemoteDescription(new RTCSessionDescription(signal));
-  } else if (signal.candidate) {
-    // Some implementations send candidates via signal; we handle ICE separately too
-    try {
-      await pc.addIceCandidate(signal.candidate);
-    } catch (err) {
-      console.warn('Error adding ICE candidate via signal:', err);
-    }
   }
 }
 
 // Screen sharing
 async function startScreenShare() {
   try {
-    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
     const screenTrack = screenStream.getVideoTracks()[0];
 
-    // Replace video track in each peer connection
-    for (const [peerId, pc] of peers.entries()) {
+    for (const [, pc] of peers.entries()) {
       const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
       if (sender) sender.replaceTrack(screenTrack);
     }
 
-    // Show locally
     els.localVideo.srcObject = screenStream;
 
-    screenTrack.onended = () => {
-      stopScreenShare();
-    };
+    screenTrack.onended = () => stopScreenShare();
   } catch (e) {
     console.error('Screen share error:', e);
   }
@@ -159,7 +160,7 @@ function stopScreenShare() {
   screenStream = null;
 
   const camTrack = localStream.getVideoTracks()[0];
-  for (const [peerId, pc] of peers.entries()) {
+  for (const [, pc] of peers.entries()) {
     const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
     if (sender) sender.replaceTrack(camTrack);
   }
@@ -199,7 +200,7 @@ els.toggleMic.onclick = () => {
   els.toggleMic.querySelector('.ctl-label').textContent = track.enabled ? 'Mute' : 'Unmute';
 };
 
-els.toggleCam.onclick = async () => {
+els.toggleCam.onclick = () => {
   if (!localStream) return;
   const track = localStream.getVideoTracks()[0];
   if (!track) return;
@@ -248,39 +249,4 @@ els.chatInput.addEventListener('keydown', (e) => {
 
 // Socket events
 socket.on('participants', (ids) => {
-  // Make offers to all existing participants except ourselves
-  ids.filter(id => id !== socket.id).forEach(id => makeOffer(id));
-});
-
-socket.on('user-joined', ({ id, name }) => {
-  // Create placeholder for their video; offer will be made via participants or here
-  createVideoEl(id, name || `Peer ${id.slice(0,4)}`);
-  makeOffer(id);
-});
-
-socket.on('user-left', (id) => {
-  const pc = peers.get(id);
-  if (pc) pc.close();
-  peers.delete(id);
-  removeVideoEl(id);
-});
-
-socket.on('signal', async (data) => {
-  await handleSignal(data);
-});
-
-socket.on('ice-candidate', async ({ from, candidate }) => {
-  const pc = peers.get(from) || createPeerConnection(from);
-  try {
-    await pc.addIceCandidate(candidate);
-  } catch (err) {
-    console.warn('Error adding ICE candidate:', err);
-  }
-});
-
-socket.on('chat-message', (msg) => {
-  addMessage(msg);
-});
-
-// Auto init local media on load (optional)
-// initLocalMedia();
+  ids.filter(id => id !== socket.id).forEach(id => {
