@@ -1,7 +1,17 @@
-// Ping — WebRTC rooms (patched)
-// Fixes: proper track addition before offers, correct ICE handling, reliable screenshare replacement
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const { v4: uuidV4 } = require('uuid');
 
-const socket = io();
+const app = express();
+const server = http.createServer(app);
+
+// ✅ This is the missing piece: create the io instance
+const io = new Server(server, {
+  cors: { origin: '*' }
+});
+
+app.use(express.static('public'));
 
 let localStream = null;
 let screenStream = null;
