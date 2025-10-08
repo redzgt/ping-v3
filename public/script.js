@@ -169,11 +169,12 @@ function stopScreenShare() {
 
 // UI bindings
 els.createBtn.onclick = async () => {
-  const { roomId } = await new Promise(resolve => socket.emit('create-room', resolve));
-  currentRoomId = roomId;
-  userName = els.nameInput.value.trim() || `Guest-${String(Math.random()).slice(2, 6)}`;
-  els.currentRoom.textContent = `Room: ${roomId}`;
   await initLocalMedia();
+  socket.emit('create-room', ({ roomId }) => {
+    currentRoomId = roomId;
+    userName = els.nameInput.value.trim() || `Guest-${String(Math.random()).slice(2, 6)}`;
+    els.currentRoom.textContent = `Room: ${roomId}`;
+  });
 };
 
 els.joinBtn.onclick = async () => {
