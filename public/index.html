@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Ping — WebRTC Conferencing</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#4f46e5" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">Ping</div>
+    <div class="room-actions">
+      <button id="createRoomBtn" class="primary">Create room</button>
+      <input id="roomCodeInput" placeholder="Enter room code" />
+      <input id="nameInput" placeholder="Your name" />
+      <button id="joinRoomBtn">Join</button>
+      <span id="currentRoom" class="room-chip"></span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="videos">
+      <div class="video-grid" id="videoGrid">
+        <div class="video-card">
+          <video id="localVideo" autoplay playsinline muted></video>
+          <div class="label" id="localLabel">You</div>
+        </div>
+        <!-- Remote videos injected here -->
+      </div>
+
+      <div class="controls">
+        <button id="toggleMic" class="control">
+          <span>🎤</span><span class="ctl-label">Mute</span>
+        </button>
+        <button id="toggleCam" class="control">
+          <span>🎥</span><span class="ctl-label">Camera Off</span>
+        </button>
+        <button id="shareScreen" class="control">
+          <span>🖥️</span><span class="ctl-label">Share screen</span>
+        </button>
+        <button id="leaveBtn" class="danger">Leave</button>
+      </div>
+    </section>
+
+    <aside class="chat">
+      <div class="chat-header">Chat</div>
+      <div id="chatMessages" class="chat-messages"></div>
+      <div class="chat-input">
+        <input id="chatInput" placeholder="Type a message..." />
+        <button id="sendChat">Send</button>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    <small>Built with WebRTC + Socket.IO</small>
+  </footer>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
